@@ -34,7 +34,9 @@ def create_arg_parser():
                        help='The template label index.', required=True)
 
     parser.add_argument('--data-path', type=pathlib.Path,
-                        help='Path to the test video (only 1).')
+                        help='Path to the test video directory.')
+    parser.add_argument('--data-name', type=str,
+                        help='Folder containing the data.')
     parser.add_argument('--out-dir', type=pathlib.Path,
                        help='Path for outputs (if any) to be stored.')
 

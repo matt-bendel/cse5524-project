@@ -1,27 +1,31 @@
 from utils.parse_args import create_arg_parser
 from utils import get_bounding_box_coords
-from data import load_data
+from data import FrameData
 from vision import TemplateMatcher, MeanShiftTracker
+
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     args = create_arg_parser().parse_args()
 
-    # TODO: Load video
-    video = load_data(args.data_path)
+    # Load video and extract target bbox
+    video_data = FrameData(args.data_path, args.data_name)
+    template_bbox = video_data.get_target_bbox_info(args.template_frame, args.template_label)
 
-    frame = args.template_frame
-    object = args.template_label
+    # Extract template and pertinent info
+    template = video_data.extract_initial_template(args.template_frame, template_bbox)
+    template_height = template.shape[0]
+    template_width = template.shape[1]
+    start_x = template_width // 2
+    start_y = template_height // 2
 
-    # TODO: Extract template from first frame and get start coords
-    template = None
-    template_height = None
-    template_width = None
-    start_x = None
-    start_y = None
+    exit()
 
-    # Get initial model
+    # TODO: Get initial model
     template_matcher = TemplateMatcher(template)
     initial_center = template_matcher.run(video[0], start_x, start_y)
+
+    exit()
 
     bounding_box_coords = {
         'mean_shift': [],
@@ -29,7 +33,8 @@ if __name__ == '__main__':
         'klt': []
     }
 
-    # TODO: Run algos
+    exit()
+
     if args.mean_shift:
         mean_shift = MeanShiftTracker(video, 16, 25, eps=1e-2)
         centers = mean_shift.run(initial_center)  # Returns the center of the tracked object for each frame
