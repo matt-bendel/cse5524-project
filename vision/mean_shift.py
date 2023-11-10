@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import numpy as np
 
 class MeanShiftTracker:
@@ -6,6 +7,7 @@ class MeanShiftTracker:
         self.n_bins = n_bins
         self.kernel_h = kernel_h
         self.eps = eps
+        self.max_iter = 50
         self.centers = []
 
     def _circular_neighbors(self, img, x, y, radius, get_coords=False):
@@ -87,4 +89,37 @@ class MeanShiftTracker:
 
         n_iters = self.frames.shape[0] - 1
 
+        for i in tqdm(range(n_iters)):
+            current_iter = 0
+            frame_t_m_1 = self.frames[i]
+            frame_t = self.frames[i+1]
 
+            new_center = (x_0, y_0)
+
+            q_feats = self._circular_neighbors(frame_t_m_1, x_0, y_0, self.kernel_h)
+            q_model = self._color_histogram(q_feats, self.n_bins, x_0, y_0, self.kernel_h)
+
+            while current_iter < self.max_iter:
+                # STEP 1
+                p_feats = self._circular_neighbors(frame_t, x_0, y_0, self.kernel_h)
+                p_model = self._color_histogram(p_feats, self.n_bins, x_0, y_0, self.kernel_h)
+
+                # STEP 2
+                weights = self._get_weights(p_feats, q_model, p_model, self.n_bins)
+
+                # STEP 3
+                new_coords = np.sum(p_feats[:, 0:2] * weights[:, None], axis=0) / np.sum(weights)
+                new_center = (x_0, y_0)
+
+                # STEP 4
+                if np.sqrt((new_coords[0] - x_0) ** 2 + (new_coords[1] - y_0)) < self.eps:
+                    break
+
+                x_0, y_0 = new_coords[0], new_coords[1]
+
+                current_iter += 1
+
+            self.centers.append(new_center)
+            x_0, y_0 = new_center[0], new_center[1]
+
+        return self.centers

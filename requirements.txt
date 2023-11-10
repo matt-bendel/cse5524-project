@@ -1,0 +1,6 @@
+tqdm
+numpy
+scikit-image
+matplotlib
+argparse
+pathlib
