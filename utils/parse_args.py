@@ -27,6 +27,8 @@ def create_arg_parser():
                        help='Whether or not to run covariance tracking.')
     parser.add_argument('--klt', action='store_true',
                        help='Whether or not to run klt.')
+    parser.add_argument('--debug', action='store_true',
+                        help='Whether or not to print/display debug info.')
 
     parser.add_argument('--template-frame', type=int,
                        help='The frame from which the template is taken.', required=True)

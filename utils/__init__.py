@@ -1,6 +1,6 @@
 def get_bounding_box_coords(center, height, width):
-    left_x = center - width // 2
-    top_y = center - height // 2
+    left_x = center[0] - width // 2
+    top_y = center[1] - height // 2
 
     tl = (left_x, top_y)
     tr = (left_x + width, top_y)

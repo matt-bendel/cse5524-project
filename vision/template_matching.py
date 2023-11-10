@@ -2,7 +2,6 @@ from tqdm import tqdm
 import numpy as np
 
 
-# TODO: Deal with color....
 class TemplateMatcher:
     def __init__(self, template):
         self.template = template
@@ -29,16 +28,27 @@ class TemplateMatcher:
         return Im[center[1] - height_shift: center[1] + height_shift + 1,
                center[0] - width_shift:center[0] + width_shift + 1, :]
 
-    def run(self, search, start_x, start_y):
+    def run(self, search, start_x, start_y, end_x=None, end_y=None):
         moving_center_y = start_y
         moving_center_x = start_x
 
         search_width = search.shape[1]
         search_height = search.shape[0]
 
+        if end_x is not None:
+            x_end = end_x
+        else:
+            x_end = search_width - self.template_width // 2 - 1
+
+        if end_y is not None:
+            y_end = end_y
+        else:
+            y_end = search_height - self.template_height // 2 - 1
+
         ncc_vals = []
-        while moving_center_x <= search_width - self.template_width // 2 - 1:
-            while moving_center_y <= search_height - self.template_height // 2 - 1:
+        pbar = tqdm(total=x_end - start_x)
+        while moving_center_x <= x_end:  # Search part of width to speed up
+            while moving_center_y <= y_end:  # Search full height
                 # Get patch
                 patch = self._get_patch(search, self.template_width // 2, self.template_height // 2,
                                         (moving_center_x, moving_center_y))
@@ -56,6 +66,7 @@ class TemplateMatcher:
 
             moving_center_y = start_y
             moving_center_x += 1
+            pbar.update(1)
 
         sorted_vals = sorted(ncc_vals, key=lambda x: x['ncc'], reverse=True)
         best_match_center = (sorted_vals[0]['center_x'], sorted_vals[0]['center_y'])
