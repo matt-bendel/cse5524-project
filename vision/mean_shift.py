@@ -7,7 +7,7 @@ class MeanShiftTracker:
         self.n_bins = n_bins
         self.kernel_h = kernel_h
         self.eps = eps
-        self.max_iter = 50
+        self.max_iter = 25 # Speed stuff up
         self.centers = []
 
     def _circular_neighbors(self, img, x, y, radius, get_coords=False):
@@ -112,14 +112,14 @@ class MeanShiftTracker:
                 new_center = (x_0, y_0)
 
                 # STEP 4
-                if np.sqrt((new_coords[0] - x_0) ** 2 + (new_coords[1] - y_0)) < self.eps:
+                if np.sqrt((new_coords[0] - x_0) ** 2 + (new_coords[1] - y_0) ** 2) < self.eps:
                     break
 
                 x_0, y_0 = new_coords[0], new_coords[1]
 
                 current_iter += 1
 
-            self.centers.append(new_center)
+            self.centers.append((int(np.round(new_center[0])), int(np.round(new_center[0]))))
             x_0, y_0 = new_center[0], new_center[1]
 
         return self.centers

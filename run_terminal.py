@@ -18,6 +18,7 @@ if __name__ == '__main__':
     template_width = template.shape[1]
 
     # Cheat a little here, so it doesn't take an eternity to run...
+    # Key Assumption: Not a lot of motion across seconds
     # start_y = template_height // 2 # Correct start, but too slow...
     start_y = template_bbox['top'] - template_height // 4
     if start_y < template_height // 2:
@@ -33,17 +34,16 @@ if __name__ == '__main__':
     end_x = start_x + template_width + template_width // 4
 
     template_matcher = TemplateMatcher(template)
-    initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x,
-                                          end_y=end_y)
+    initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x, end_y=end_y)
 
     if args.debug:
         plt.imshow(template.astype('uint8'))
-        plt.savefig('true_template.png')
+        plt.savefig('out/true_template.png')
 
         coords = get_bounding_box_coords(initial_center, template_height, template_width)
         temp = video_data.frames[0, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
         plt.imshow(temp.astype('uint8'))
-        plt.savefig('extracted_template.png')
+        plt.savefig('out/extracted_template.png')
 
     bounding_box_coords = {
         'mean_shift': [],
@@ -51,16 +51,29 @@ if __name__ == '__main__':
         'klt': []
     }
 
-    exit()
-
     if args.mean_shift:
-        mean_shift = MeanShiftTracker(video, 16, 25, eps=1e-2)
+        video = video_data.frames
+
+        if args.debug and args.debug_frames > 0:
+            video = video[0:args.debug_frames]
+
+        mean_shift = MeanShiftTracker(video, 16, 25, eps=1e-1)
+        # Due to radius of template width, shift up y coord of center to better track person
         centers = mean_shift.run(initial_center)  # Returns the center of the tracked object for each frame
 
+        count = 0
         for center in centers:
-            bounding_box_coords['mean_shift'].append(get_bounding_box_coords(center, template_height, template_width))
+            coords = get_bounding_box_coords(center, template_height, template_width)
+            if args.debug:
+                temp = video_data.frames[count, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
+                plt.imshow(temp.astype('uint8'))
+                plt.savefig(f'out/ms_{count}.png')
 
-    if args.covarince:
+            count += 1
+
+            bounding_box_coords['mean_shift'].append(coords)
+
+    if args.covariance:
         pass  # TODO
 
     if args.klt:

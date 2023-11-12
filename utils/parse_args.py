@@ -34,6 +34,8 @@ def create_arg_parser():
                        help='The frame from which the template is taken.', required=True)
     parser.add_argument('--template-label', type=int,
                        help='The template label index.', required=True)
+    parser.add_argument('--debug-frames', type=int,
+                        help='In debug mode how many frames to use for motion tracking.', default=10)
 
     parser.add_argument('--data-path', type=pathlib.Path,
                         help='Path to the test video directory.')
