@@ -7,7 +7,7 @@ class MeanShiftTracker:
         self.n_bins = n_bins
         self.kernel_h = kernel_h
         self.eps = eps
-        self.max_iter = 25 # Speed stuff up
+        self.max_iter = 50 # Speed stuff up
         self.centers = []
 
     def _circular_neighbors(self, img, x, y, radius, get_coords=False):
@@ -94,8 +94,6 @@ class MeanShiftTracker:
             frame_t_m_1 = self.frames[i]
             frame_t = self.frames[i+1]
 
-            new_center = (x_0, y_0)
-
             q_feats = self._circular_neighbors(frame_t_m_1, x_0, y_0, self.kernel_h)
             q_model = self._color_histogram(q_feats, self.n_bins, x_0, y_0, self.kernel_h)
 
@@ -109,7 +107,6 @@ class MeanShiftTracker:
 
                 # STEP 3
                 new_coords = np.sum(p_feats[:, 0:2] * weights[:, None], axis=0) / np.sum(weights)
-                new_center = (x_0, y_0)
 
                 # STEP 4
                 if np.sqrt((new_coords[0] - x_0) ** 2 + (new_coords[1] - y_0) ** 2) < self.eps:
@@ -119,7 +116,7 @@ class MeanShiftTracker:
 
                 current_iter += 1
 
-            self.centers.append((int(np.round(new_center[0])), int(np.round(new_center[0]))))
-            x_0, y_0 = new_center[0], new_center[1]
+            self.centers.append((int(np.round(new_coords[0])), int(np.round(new_coords[0]))))
+            x_0, y_0 = new_coords[0], new_coords[1]
 
         return self.centers

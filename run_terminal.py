@@ -57,7 +57,7 @@ if __name__ == '__main__':
         if args.debug and args.debug_frames > 0:
             video = video[0:args.debug_frames]
 
-        mean_shift = MeanShiftTracker(video, 16, 25, eps=1e-1)
+        mean_shift = MeanShiftTracker(video, 16, template_width // 2)
         # Due to radius of template width, shift up y coord of center to better track person
         centers = mean_shift.run(initial_center)  # Returns the center of the tracked object for each frame
 
