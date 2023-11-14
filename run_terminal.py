@@ -12,7 +12,6 @@ if __name__ == '__main__':
     video_data = FrameData(args.data_path, args.data_name)
     template_bbox = video_data.get_target_bbox_info(args.template_frame, args.template_label)
 
-    # Extract template and pertinent info
     template = video_data.extract_initial_template(args.template_frame, template_bbox)
     template_height = template.shape[0]
     template_width = template.shape[1]
