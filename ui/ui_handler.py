@@ -1,23 +1,32 @@
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join('..', 'data')))
+sys.path.append(os.path.abspath(os.path.join('..', 'vision')))
+sys.path.append(os.path.abspath(os.path.join('..', 'utils')))
+
+from vision import MeanShiftTracker, TemplateMatcher # TODO: Other methods
+from data import FrameData
+from utils import get_bounding_box_coords
 from PIL import Image
 
 import PySimpleGUI as sg
-
-import os
 import io
-
+import matplotlib.pyplot as plt
 
 class UIHandler:
     def __init__(self, base_dir):
         self.current_layout = 1
+        self.base_dir = base_dir
         self.selected_video = ''
         self.selected_template_id = ''
         self.video_data = None
 
-        self.video_options = self._get_video_options(base_dir)
+        self.video_options = self._get_video_options()
         self.tracking_options = ['klt', 'covariance', 'ms']
         self.template_data = {}
         for folder in self.video_options:
-            self.template_data[folder] = self._get_template_options(base_dir, folder)
+            self.template_data[folder] = self._get_template_options(folder)
 
         layout = self._get_layouts(base_dir)
         self.window = sg.Window('Swapping the contents of a window', layout, size=(900, 600), element_justification='c')
@@ -80,13 +89,14 @@ class UIHandler:
         )
         layout3.append([sg.Button('Back to Template Select', key='to-template-select', visible=False)])
 
-        return [layout1, layout2, layout3]
+        layout4 = [[sg.Text('Please wait while we track your target. This will take a few minutes.', key='please-wait', visible=False)]]
 
-        # TODO: template match/Tracking algo progress ->
+        return [layout1, layout2, layout3, layout4]
+
         # TODO: Tracking algo results - video, metrics (back to start)
 
-    def _get_video_options(self, base_dir):
-        video_dir = os.listdir(os.path.join(base_dir, 'data'))
+    def _get_video_options(self):
+        video_dir = os.listdir(os.path.join(self.base_dir, 'data'))
         parsed_video_options = []
 
         for file in video_dir:
@@ -95,23 +105,69 @@ class UIHandler:
 
         return parsed_video_options
 
-    def _get_template_options(self, base_dir, folder):
-        template_dir = os.listdir(os.path.join(base_dir, f'ui/templates/{folder}'))
+    def _get_template_options(self, folder):
+        template_dir = os.listdir(os.path.join(self.base_dir, f'ui/templates/{folder}'))
         parsed_template_options = []
 
         for file in template_dir:
-            parsed_template_options.append(os.path.join(base_dir, f'ui/templates/{folder}/{file}'))
+            parsed_template_options.append(os.path.join(self.base_dir, f'ui/templates/{folder}/{file}'))
 
         return parsed_template_options
 
-    def _perform_template_match(self):
-        pass
+    def _load_video(self):
+        return FrameData(os.path.join(self.base_dir, 'data'), self.selected_video)
 
-    def _perform_motion_tracking(self):
-        pass
+    def _perform_template_match(self, video_data, template, template_bbox):
+        template_height = template.shape[0]
+        template_width = template.shape[1]
 
-    def _progress_bar(self):
-        pass
+        start_y = template_bbox['top'] - template_height // 4
+        if start_y < template_height // 2:
+            start_y = template_height // 2
+
+        end_y = start_y + template_height + template_height // 4
+
+        start_x = template_bbox['left'] - template_width // 4
+        if start_x < template_width // 2:
+            start_x = template_width // 2
+
+        end_x = start_x + template_width + template_width // 4
+
+        template_matcher = TemplateMatcher(template)
+        initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x, end_y=end_y)
+
+        return initial_center
+
+    def _perform_motion_tracking(self, method, video_data, template_width, template_height, initial_center):
+        bounding_box_coords = []
+
+        if method == 'ms':
+            video = video_data.frames
+            mean_shift = MeanShiftTracker(video, 16, template_width // 2)
+            # Due to radius of template width, shift up y coord of center to better track person
+            centers = mean_shift.run(initial_center)  # Returns the center of the tracked object for each frame
+
+            count = 0
+            for center in centers:
+                coords = get_bounding_box_coords(center, template_height, template_width)
+                # TODO: REMOVE BELOW
+                temp = video_data.frames[count, coords[0][0][1]:coords[1][0][1],
+                       coords[0][0][0]:coords[0][1][0], :]
+                plt.imshow(temp.astype('uint8'))
+                plt.savefig(f'out/ms_ui_{count}.png')
+
+                count += 1
+                # TODO: REMOVE ABOVE
+
+                bounding_box_coords.append(coords)
+
+        elif method == 'covariance':
+            pass  # TODO - Ana
+
+        elif method == 'klt':
+            pass  # TODO - Ana
+
+        return bounding_box_coords
 
     def _toggle_video_select(self, show):
         for folder in self.video_options:
@@ -135,6 +191,8 @@ class UIHandler:
         self.window['to-template-select'].update(visible=show)
         self.window['tracking-select-header'].update(visible=show)
 
+    def _toggle_progress(self, show):
+        self.window['please-wait'].update(visible=show)
 
     def run(self):
         # Core loop in here
@@ -164,13 +222,27 @@ class UIHandler:
                 self._toggle_template_select(True)
                 self._toggle_tracking_select(False)
             elif event in self.tracking_options:
+                self._toggle_template_select(False)
+                self._toggle_progress(True)
+
                 tracking_method = event
-                print(f'SELECTED TRACKER: {tracking_method}')
-                # TODO: hide track select, show progress
-                # TODO: Dataload
-                # TODO: template match
-                # TODO: track
-                # TODO: Move to results
-                pass
+
+                # Load video and extract target bbox
+                video_data = self._load_video()
+                template_bbox = video_data.get_target_bbox_info(60, self.selected_template_id)
+                template = video_data.extract_initial_template(0, template_bbox)
+
+                initial_center = self._perform_template_match(video_data, template, template_bbox)
+                bbox_coords = self._perform_motion_tracking(tracking_method, video_data, template.shape[1], template.shape[0], initial_center)
+
+                # TODO: Ana - get video
+                # TODO: Matt - display video
+
+                self._toggle_progress(False)
+                # TODO: self._toggle_results(True)
+                self.selected_video = ''
+                self.selected_template_id = ''
+                self._toggle_video_select(True) # TODO: remove
+
 
         self.window.close()

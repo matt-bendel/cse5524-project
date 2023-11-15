@@ -46,7 +46,7 @@ class FrameData:
         relevant_info = None
 
         for ind in gt_frame_data_inds:
-            if self.gt_data[ind, 1] == template_id:
+            if self.gt_data[ind, 1] == int(template_id):
                 relevant_info = self.gt_data[ind]
 
         return {
