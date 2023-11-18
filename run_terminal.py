@@ -73,7 +73,25 @@ if __name__ == '__main__':
             bounding_box_coords['mean_shift'].append(coords)
 
     if args.covariance:
-        pass  # TODO
+        initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
+        video = video_data.frames
+
+        if args.debug and args.debug_frames > 0:
+            video = video[0:args.debug_frames]
+        
+        covariance = CovarianceTracker(video, template_height, template_width)
+        bboxs = covariance.run(initial_bbox)
+
+        count = 0
+        for bbox in bboxs:
+            if args.debug:
+                temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :] # TODO: check coordinators
+                plt.imshow(temp.astype('uint8'))
+                plt.savefig(f'out/ms_{count}.png')
+
+            count += 1
+
+            bounding_box_coords['covariance'].append(coords)
 
     if args.klt:
         pass  # TODO

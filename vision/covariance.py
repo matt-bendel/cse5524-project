@@ -7,8 +7,7 @@ class CovarianceTracker:
         self.frames = frames
         self.window_h = window_h
         self.window_w = window_w
-        self.max_iter = 50 # Speed stuff up
-        self.centers = []
+        self.bounding_box = []
 
     def _patch_cov(self, patch):
         f_k = np.zeros((5, patch.shape[0]*patch.shape[1]))
@@ -21,31 +20,31 @@ class CovarianceTracker:
         e, _ = scipy.linalg.eig(c_model, c_candidate)
         return np.sqrt((np.log(e)**2).sum())
 
-    def run(self, initial_model_xy):
-        x_0 = initial_model_xy[0]
-        y_0 = initial_model_xy[1]
-
-        self.centers = [(x_0, y_0)]
+    def run(self, initial_bounding_box):
+        self.bounding_box = initial_bounding_box  # [[tl, tr], [bl, br]]
+        x_0 = initial_bounding_box[0][0][0]
+        y_0 = initial_bounding_box[0][0][1]
+        x_1 = initial_bounding_box[0][1][0]
+        y_1 = initial_bounding_box[0][1][1]
 
         n_iters = self.frames.shape[0] - 1
 
         for i in tqdm(range(n_iters)):
-            current_iter = 0
             frame_t_m_1 = self.frames[i]
             frame_t = self.frames[i+1]
 
-            c_model = self._patch_cov(frame_t_m_1[x_0 - self.window_h // 2: x_0 + self.window_h // 2,
-                                              y_0 - self.window_w // 2: y_0 + self.window_w // 2])
+            c_model = self._patch_cov(frame_t_m_1[x_0:x_1, y_0:y_1])
             match_distances = np.zeros((frame_t_m_1.shape[0] - self.window_h+1, frame_t_m_1.shape[1] - self.window_w+1), dtype=float)
             
-            for row in range(frame_t_m_1.shape[0] - self.window_h + 1):
-                for col in range(frame_t_m_1.shape[1] - self.window_w + 1):
-                    window = frame_t_m_1[row:row+self.window_h, col:col+self.window_w]
+            for row in range(frame_t.shape[0] - self.window_h + 1):
+                for col in range(frame_t.shape[1] - self.window_w + 1):
+                    window = frame_t[row:row+self.window_h, col:col+self.window_w]
                     c_candidate = self._patch_cov(window)
                     distance = self._distance_metric(c_model, c_candidate)
                     match_distances[row, col] = distance
 
                 x, y = np.unravel_index(match_distances.argmin(), match_distances.shape)
-                self.centers.append((x+self.window_h, y+self.window_w))
+                x_0, x_1, y_0, y_1 = x, x+self.window_h, y, y+self.window_w 
+                self.bounding_box.append([[x_0, y_0], [x_1, y_1]])
 
-        return self.centers
+        return self.bounding_box
