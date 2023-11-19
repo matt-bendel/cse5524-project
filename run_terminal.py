@@ -1,7 +1,7 @@
 from utils.parse_args import create_arg_parser
 from utils import get_bounding_box_coords
 from data import FrameData
-from vision import TemplateMatcher, MeanShiftTracker
+from vision import TemplateMatcher, MeanShiftTracker, CovarianceTracker
 
 import matplotlib.pyplot as plt
 
