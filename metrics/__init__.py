@@ -1,19 +1,17 @@
-from .accuracy import calculate_accuracy
+from .iou import calculate_iou
 from .ssim import calculate_ssim
-import tqdm
+from tqdm import tqdm 
 import numpy as np
 
-def eval(video_data, template_label, pred_bboxes):
-    accuracy = []
+def eval(frames, pred_bboxes, gt_bboxes):
+    iou = []
     ssim = []
-    frames = video_data.frames
-    n_iters = frames.shape[0] - 1
+    # n_iters = frames.shape[0] - 1
+    n_iters = len(pred_bboxes) # deal with the number of bbox here
 
     for i in tqdm(range(n_iters)):
-        frame = frames[i]
-        video_data.get_target(frame, template_label)
-        accuracy.append(calculate_accuracy)
-        ssim.append(calculate_ssim)
+        iou.append(calculate_iou(gt_bboxes[i], pred_bboxes[i]))
+        ssim.append(calculate_ssim(frames[i, :, :, :], gt_bboxes[i], pred_bboxes[i]))
 
-    return np.mean(accuracy), np.mean(ssim)
+    return np.mean(iou), np.mean(ssim)
 

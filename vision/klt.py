@@ -1,112 +1,94 @@
 import numpy as np
+from tqdm import tqdm
 
 class KLTTracker:
-    def __init__(self, frames):
+    def __init__(self, frames, window_h, window_w):
         self.frames = frames
-        self.optical_flow = LKOpticalFlow(frames)  # Initialize the LKOpticalFlow
-        self.tracked_keypoints = []
-        self.window_size = 5  # Define your window size for tracking here
-
-    def detect_keypoints(self, frame):
-        # Implement a method to detect keypoints in a frame
-        # For example, using corner detection methods like Harris Corner Detector or Shi-Tomasi
-        # Here, I'm assuming a simple random choice of keypoints for demonstration purposes
-        height, width, _ = frame.shape
-        num_keypoints = 10
-        x = np.random.randint(0, width, num_keypoints)
-        y = np.random.randint(0, height, num_keypoints)
-        return np.array(list(zip(x, y)))
+        self.window_h = window_h
+        self.window_w = window_w
+        self.optical_flow = LKOpticalFlow()
+        self.tracked_bounding_boxes = []
 
     def track_keypoints(self):
         num_frames = len(self.frames)
+        initial_frame = self.frames[0]
+        
+        # Select initial keypoints from the given window in the first frame
+        initial_keypoints = self.select_initial_keypoints(initial_frame)
+        self.tracked_bounding_boxes.append(self.get_bounding_box(initial_keypoints))
+
         for i in range(num_frames - 1):
             current_frame = self.frames[i]
             next_frame = self.frames[i + 1]
 
-            if i == 0:
-                self.optical_flow.compute_optical_flow()  # Compute once for initial keypoints
+            # Track keypoints between frames using Lucas-Kanade Optical Flow
+            tracked_points = self.optical_flow.compute_optical_flow(current_frame, next_frame, initial_keypoints)
+            self.tracked_bounding_boxes.append(self.get_bounding_box(tracked_points))
 
-            tracked_points = self.optical_flow.compute_optical_flow()
-            self.tracked_keypoints.append(tracked_points)
+        return self.tracked_bounding_boxes
 
-        return self.tracked_keypoints
+    def select_initial_keypoints(self, frame):
+        # Select initial keypoints from the given window in the first frame
+        height, width, _ = frame.shape
+        start_x = np.random.randint(0, width - self.window_w)
+        start_y = np.random.randint(0, height - self.window_h)
+        
+        window = frame[start_y:start_y + self.window_h, start_x:start_x + self.window_w]
+        points = self.detect_features(window)
+
+        # Convert keypoints coordinates to the entire frame coordinates
+        initial_keypoints = points + np.array([start_x, start_y])
+
+        return initial_keypoints
+
+    def detect_features(self, frame):
+        # Detect features using a simple method (e.g., corner detection)
+        # Example: using the Harris corner detection algorithm (you can replace it with your feature detection method)
+        from scipy.ndimage import gaussian_filter
+
+        dx = np.array([[1, 0, -1]])
+        dy = dx.T
+
+        Ix = gaussian_filter(frame, 1.5) @ dx
+        Iy = gaussian_filter(frame, 1.5) @ dy
+
+        # Compute Harris corner response
+        Ixx = Ix**2
+        Iyy = Iy**2
+        Ixy = Ix * Iy
+
+        Sxx = gaussian_filter(Ixx, 1)
+        Syy = gaussian_filter(Iyy, 1)
+        Sxy = gaussian_filter(Ixy, 1)
+
+        det = Sxx * Syy - Sxy**2
+        trace = Sxx + Syy
+        R = det - 0.05 * trace**2
+
+        # Threshold the response to find corners
+        threshold = 0.01 * np.max(R)
+        R[R < threshold] = 0
+
+        # Get coordinates of detected features
+        keypoints = np.argwhere(R > 0)
+
+        return keypoints
+
+    def get_bounding_box(self, points):
+        # Generate a single bounding box around all tracked points within the window
+        min_x = int(min(points[:, 1]))
+        min_y = int(min(points[:, 0]))
+        max_x = int(max(points[:, 1]))
+        max_y = int(max(points[:, 0]))
+
+        return ((min_x, min_y), (max_x, max_y))
 
 class LKOpticalFlow:
-    def __init__(self, frames):
-        self.frames = frames
-        self.window_size = 5  # Define your window size for tracking here
-        self.num_levels = 3  # Pyramid levels for coarse-to-fine approach
-        self.threshold = 0.01  # Convergence threshold
-        self.max_iters = 50  # Maximum iterations for each point
+    def __init__(self):
+        self.max_iters = 30  # Maximum iterations for each point
+        self.eps = 0.03  # Convergence criterion for termination
 
-    def compute_gradients(self, frame):
-        # Compute gradients using Sobel operators
-        gx = np.gradient(frame, axis=1)
-        gy = np.gradient(frame, axis=0)
-        return gx, gy
-
-    def compute_optical_flow(self):
-        num_frames = len(self.frames)
-        tracked_points = []
-
-        for i in range(num_frames - 1):
-            current_frame = self.frames[i]
-            next_frame = self.frames[i + 1]
-
-            # Detect key points (for simplicity, using random points here)
-            height, width, _ = current_frame.shape
-            num_keypoints = 10
-            x = np.random.randint(self.window_size, width - self.window_size, num_keypoints)
-            y = np.random.randint(self.window_size, height - self.window_size, num_keypoints)
-            points = np.array(list(zip(x, y)), dtype=np.float32)
-
-            for level in range(self.num_levels, 0, -1):
-                for j, (x, y) in enumerate(points):
-                    x = int(x)
-                    y = int(y)
-
-                    # Define the window around the point
-                    window_x = current_frame[max(0, y - self.window_size):min(y + self.window_size, height),
-                                             max(0, x - self.window_size):min(x + self.window_size, width)]
-
-                    gx, gy = self.compute_gradients(window_x)
-
-                    # Compute the gradients in the window
-                    A = np.column_stack((gx.flatten(), gy.flatten()))
-
-                    b = -np.dot(A.T, np.ones(A.shape[0]))
-
-                    delta_p = np.zeros(2)
-                    delta = np.inf
-
-                    for _ in range(self.max_iters):
-                        x_warp = int(x + delta_p[0])
-                        y_warp = int(y + delta_p[1])
-
-                        window_next = next_frame[max(0, y_warp - self.window_size):min(y_warp + self.window_size, height),
-                                                 max(0, x_warp - self.window_size):min(x_warp + self.window_size, width)]
-
-                        error = window_x - window_next
-
-                        error = error.flatten()
-
-                        # Compute error gradient
-                        error_grad = np.dot(A.T, error)
-
-                        # Compute the update to the parameter
-                        dp = np.linalg.lstsq(A.T @ A, -A.T @ error, rcond=None)[0]
-
-                        delta_p += dp
-
-                        # Check convergence
-                        delta = np.linalg.norm(dp)
-                        if delta < self.threshold:
-                            break
-
-                    points[j] += delta_p
-
-                points /= 2  # Downsample the points for the next pyramid level
-
-            tracked_points.append(points)
-
-        return tracked_points
+    def compute_optical_flow(self, current_frame, next_frame, keypoints):
+        # Your implementation of Lucas-Kanade Optical Flow using keypoints
+        # ... (implement as needed for tracking between frames)
+        pass

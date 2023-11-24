@@ -55,6 +55,22 @@ class FrameData:
             'width': int(relevant_info[4]),
             'height': int(relevant_info[5])
         }
+    
+    def get_all_bbox_info(self, template_id, debug_frames=0):
+        gt_bbox = []
+        video = self.frames
+        if debug_frames != 0:
+            video = video[0:debug_frames]
+
+        for idx in range(video.shape[0]):
+            bbox = self.get_target_bbox_info(idx+1, template_id)
+            bl = (bbox['left'], bbox['top'])
+            br = (bbox['left'] + bbox['width'], bbox['top'])
+            tl = (bbox['left'], bbox['top'] + bbox['height'])
+            tr = (bbox['left'] + bbox['width'], bbox['top'] + bbox['height'])
+            bbox = [[bl, br], [tl, tr]]
+            gt_bbox.append(bbox)
+        return gt_bbox
 
     def extract_initial_template(self, template_frame, bbox_info):
         return self.frames[template_frame, bbox_info['top']:bbox_info['top']+bbox_info['height'], bbox_info['left']:bbox_info['left']+bbox_info['width'], :]
