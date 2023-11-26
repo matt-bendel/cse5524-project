@@ -3,11 +3,12 @@ from utils.parse_args import create_arg_parser
 from utils import get_bounding_box_coords
 from utils.reconstruct_video import reconstruct_video
 from data import FrameData
-from vision import TemplateMatcher, MeanShiftTracker, CovarianceTracker
+from vision import TemplateMatcher, MeanShiftTracker, CovarianceTracker, KLTTracker
 from metrics import eval
-import ast
 
+import ast
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 if __name__ == '__main__':
     args = create_arg_parser().parse_args()
@@ -36,22 +37,24 @@ if __name__ == '__main__':
 
     end_x = start_x + template_width + template_width // 4
 
-    # template_matcher = TemplateMatcher(template)
-    # initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x, end_y=end_y)
-    initial_center = (519, 534) # Debug
+    template_matcher = TemplateMatcher(template)
+    initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x, end_y=end_y)
+    # print(initial_center)
+    # initial_center = (519, 534) # Debug 1
+    # initial_center = (518, 604) # all 1
 
-    # if args.debug:
-    #     plt.imshow(template.astype('uint8'))
-    #     plt.savefig('out/true_template.png')
+    if args.debug:
+        plt.imshow(template.astype('uint8'))
+        plt.savefig('out/true_template.png')
 
-    #     coords = get_bounding_box_coords(initial_center, template_height, template_width)
-    #     temp = video_data.frames[0, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
-    #     plt.imshow(temp.astype('uint8'))
-    #     plt.savefig('out/extracted_template.png')
+        coords = get_bounding_box_coords(initial_center, template_height, template_width)
+        temp = video_data.frames[0, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
+        plt.imshow(temp.astype('uint8'))
+        plt.savefig('out/extracted_template.png')
 
-    gt_bbox = video_data.get_all_bbox_info(args.template_label, args.debug_frames)
+    # gt_bbox = video_data.get_all_bbox_info(args.template_label, args.debug_frames)
 
-    output_path = f'out/gt_video.mp4' # test
+    # output_path = f'out/gt_video.mp4' # test
     # reconstruct_video(output_path, video, gt_bbox)
         
     bounding_box_coords = {
@@ -116,26 +119,51 @@ if __name__ == '__main__':
 
             count += 1
 
-            bounding_box_coords['covariance'].append(bboxs)
+        bounding_box_coords['covariance'] = bboxs
 
     if args.klt:
-        pass  # TODO
+        initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
+        video = video_data.frames
+
+        if args.debug and args.debug_frames > 0:
+            video = video[0:args.debug_frames]
+        
+        klt = KLTTracker(video, template_height, template_width)
+        bboxs = klt.run(initial_bbox)
+
+        count = 0
+        for bbox in bboxs:
+            if args.debug:
+                temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :]
+                plt.imshow(temp.astype('uint8'))
+                plt.savefig(f'out/ms_{count}.png')
+
+            count += 1
+
+        bounding_box_coords['klt'] = bboxs
 
     # TODO: Save results, i.e. reconstruct video
-    output_path = 'out/mean_shift_video.mp4' # test
-    file_path = 'out/bbox_coords_result.json'
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    output_path = 'out/covariance_video' + str(current_datetime) + '.mp4' # test
+    # file_path = r'C:\Users\anaxx\Desktop\AU23\CSE5524\cse5524-project\out\bbox_coords_result2023-11-25 19-27-00.json'
+    file_path = r'C:\Users\anaxx\Desktop\AU23\CSE5524\cse5524-project\out\bbox_coords_result' + str(current_datetime) + '.json'
 
-    # with open(file_path, 'w') as file:
-    #     file.write(str(bounding_box_coords))
-    # reconstruct_video(output_path, video, bounding_box_coords['mean_shift'])
+
+    if args.mean_shift or args.covariance or args.klt:
+        with open(file_path, 'w') as file:
+            file.write(str(bounding_box_coords))
+        output_path = 'out/covariance_video' + str(current_datetime) + '.mp4'
+        reconstruct_video(output_path, video, bounding_box_coords['covariance'])
 
     with open(file_path, 'r') as file:
         pred_bboxes = file.read()
         pred_bboxes = ast.literal_eval(pred_bboxes)
     
     video = video_data.frames
-    iou, ssim = eval(video, pred_bboxes['mean_shift'], gt_bbox)
-    accuracy['mean_shift']['iou'] = iou
-    accuracy['mean_shift']['ssim'] = ssim
+    # reconstruct_video(output_path, video, pred_bboxes['mean_shift'])
+    gt_bbox = video_data.get_all_bbox_info(args.template_label, len(pred_bboxes['covariance']))
+    iou, ssim = eval(video, pred_bboxes['covariance'], gt_bbox)
+    accuracy['covariance']['iou'] = iou
+    accuracy['covariance']['ssim'] = ssim
 
     print(accuracy)
