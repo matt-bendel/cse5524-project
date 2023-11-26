@@ -7,9 +7,9 @@ def eval(frames, pred_bboxes, gt_bboxes):
     iou = []
     ssim = []
     # n_iters = frames.shape[0] - 1
-    n_iters = len(pred_bboxes) # deal with the number of bbox here
-
+    n_iters = len(pred_bboxes) - 1 # deal with the number of bbox here
     for i in tqdm(range(n_iters)):
+
         iou.append(calculate_iou(gt_bboxes[i], pred_bboxes[i]))
         ssim.append(calculate_ssim(frames[i, :, :, :], gt_bboxes[i], pred_bboxes[i]))
 
