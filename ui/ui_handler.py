@@ -5,9 +5,10 @@ sys.path.append(os.path.abspath(os.path.join('..', 'data')))
 sys.path.append(os.path.abspath(os.path.join('..', 'vision')))
 sys.path.append(os.path.abspath(os.path.join('..', 'utils')))
 
-from vision import MeanShiftTracker, TemplateMatcher # TODO: Other methods
+from vision import MeanShiftTracker, TemplateMatcher, CovarianceTracker, KLTTracker
 from data import FrameData
 from utils import get_bounding_box_coords
+from utils.reconstruct_video import reconstruct_video
 from PIL import Image
 
 import PySimpleGUI as sg
@@ -91,9 +92,14 @@ class UIHandler:
 
         layout4 = [[sg.Text('Please wait while we track your target. This will take a few minutes.', key='please-wait', visible=False)]]
 
-        return [layout1, layout2, layout3, layout4]
+        layout5 = [[sg.Text('Results', key='results-header', visible=False)]]
+        layout5.append([sg.Text('Your video has been saved!', key='results-footer', visible=False)])
+        layout5.append([sg.Button('Back to Start', key='back-to-start', visible=False)])
 
-        # TODO: Tracking algo results - video, metrics (back to start)
+        return [layout1, layout2, layout3, layout4, layout5]
+
+
+
 
     def _get_video_options(self):
         video_dir = os.listdir(os.path.join(self.base_dir, 'data'))
@@ -147,25 +153,27 @@ class UIHandler:
             # Due to radius of template width, shift up y coord of center to better track person
             centers = mean_shift.run(initial_center)  # Returns the center of the tracked object for each frame
 
-            count = 0
             for center in centers:
                 coords = get_bounding_box_coords(center, template_height, template_width)
-                # TODO: REMOVE BELOW
-                temp = video_data.frames[count, coords[0][0][1]:coords[1][0][1],
-                       coords[0][0][0]:coords[0][1][0], :]
-                plt.imshow(temp.astype('uint8'))
-                plt.savefig(f'out/ms_ui_{count}.png')
-
-                count += 1
-                # TODO: REMOVE ABOVE
 
                 bounding_box_coords.append(coords)
 
         elif method == 'covariance':
-            pass  # TODO - Ana
+            initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
+            video = video_data.frames
+
+            covariance = CovarianceTracker(video, template_height, template_width)
+            bboxs = covariance.run(initial_bbox)
+
+            for bbox in bboxs:
+                bounding_box_coords.append(bbox)
 
         elif method == 'klt':
-            pass  # TODO - Ana
+            initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
+            video = video_data.frames
+
+            klt = KLTTracker(video, template_height, template_width)
+            bounding_box_coords = klt.run(initial_bbox)
 
         return bounding_box_coords
 
@@ -193,6 +201,11 @@ class UIHandler:
 
     def _toggle_progress(self, show):
         self.window['please-wait'].update(visible=show)
+
+    def _toggle_results(self, show):
+        self.window['results-header'].update(visible=show)
+        self.window['results-video'].update(visible=show)
+        self.window['back-to-start'].update(visible=show)
 
     def run(self):
         # Core loop in here
@@ -234,15 +247,19 @@ class UIHandler:
 
                 initial_center = self._perform_template_match(video_data, template, template_bbox)
                 bbox_coords = self._perform_motion_tracking(tracking_method, video_data, template.shape[1], template.shape[0], initial_center)
+                output_path = 'ui_video_result.mp4'
+                reconstruct_video(output_path, video_data.frames, bbox_coords)
 
-                # TODO: Ana - get video
                 # TODO: Matt - display video
 
                 self._toggle_progress(False)
-                # TODO: self._toggle_results(True)
+                self._toggle_results(True)
+
                 self.selected_video = ''
                 self.selected_template_id = ''
-                self._toggle_video_select(True) # TODO: remove
+            elif event == 'back-to-start':
+                self._toggle_results(False)
+                self._toggle_video_select(True)
 
 
         self.window.close()

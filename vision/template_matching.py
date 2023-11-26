@@ -24,6 +24,12 @@ class TemplateMatcher:
 
         return np.sum(inner_sum) / 3
 
+    def _sad(self, P, T):
+        return np.sum(np.abs(T - P))
+
+    def _sse(self, P, T):
+        return np.sum((T - P) ** 2)
+
     def _get_patch(self, Im, width_shift, height_shift, center):
         return Im[center[1] - height_shift: center[1] + height_shift + 1,
                center[0] - width_shift:center[0] + width_shift + 1, :]

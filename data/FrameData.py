@@ -28,7 +28,7 @@ class FrameData:
         self.im_width = int(seq_info['imWidth'])
         self.im_ext = seq_info['imExt']
         self.frame_rate = int(seq_info['frameRate'])
-        self.seq_length = int(seq_info['seqLength']) // 2 # TODO: Remove division, added to speed up testing
+        self.seq_length = int(seq_info['seqLength'])
 
         self.frames = np.zeros((self.seq_length, self.im_height, self.im_width, 3))
 
