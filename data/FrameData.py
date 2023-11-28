@@ -56,11 +56,11 @@ class FrameData:
             'height': int(relevant_info[5])
         }
     
-    def get_all_bbox_info(self, template_id, debug_frames=0):
+    def get_all_bbox_info(self, template_id, num_frames=0):
         gt_bbox = []
         video = self.frames
-        if debug_frames != 0:
-            video = video[0:debug_frames]
+        if num_frames != 0:
+            video = video[0:num_frames]
 
         for idx in range(video.shape[0]):
             bbox = self.get_target_bbox_info(idx+1, template_id)

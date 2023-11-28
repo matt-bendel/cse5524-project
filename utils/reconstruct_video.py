@@ -18,7 +18,6 @@ def reconstruct_video(output_path, frames, bboxes, color='green'):
         color = 'green'
     color = mcolors.to_rgb(color)
     color = tuple(int(value * 255) for value in color)
-    print(color)
 
     height, width, _ = frames[0].shape
     frames_copy = [np.copy(frame) for frame in frames]

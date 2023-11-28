@@ -1,3 +1,4 @@
+from matplotlib import patches
 import numpy as np
 from tqdm import tqdm
 import scipy
@@ -33,11 +34,6 @@ class CovarianceTracker:
         frame_t = self.frames[0]
         n_iters = self.frames.shape[0] - 1
 
-        output_file = "covariance_bbox_1-33.json"
-        with open(output_file, 'w') as json_file:
-            json_file.write("[")
-
-        # for i in tqdm(range(n_iters)):
         for i in tqdm(range(n_iters)):
             frame_t_m_1 = self.frames[i]
             frame_t = self.frames[i+1]
@@ -63,19 +59,17 @@ class CovarianceTracker:
 
 
             y, x = np.unravel_index(match_distances.argmin(), match_distances.shape)
-            # print(y, x)
             x_0, x_1, y_0, y_1 = x*step + start_x, x*step + start_x + self.window_w, y*step + start_y, y*step + start_y + self.window_h
             # print(y_0, y_1, x_0, x_1)
             bl, br, tl, tr = (x_0, y_0), (x_1, y_0), (x_0, y_1), (x_1, y_1)
             bbox = [[bl, br], [tl, tr]]
-            self.bounding_box.append(bbox)
 
-            with open(output_file, 'a') as json_file:
-                if i > 0:
-                    json_file.write(", ")
-                json.dump(str(bbox), json_file)
+            # fig, ax = plt.subplots()
+            # ax.imshow(frame_t.astype('uint8'))
+            # rect = patches.Rectangle(bbox[0][0], x_1-x_0, y_1-y_0, linewidth=1, edgecolor='r', facecolor='none')
+            # ax.add_patch(rect)
+            # plt.show()
 
-        with open(output_file, 'a') as json_file:
-            json_file.write("]")            
+            self.bounding_box.append(bbox)    
 
         return self.bounding_box
