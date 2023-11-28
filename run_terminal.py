@@ -39,9 +39,8 @@ if __name__ == '__main__':
 
     template_matcher = TemplateMatcher(template)
     initial_center = template_matcher.run(video_data.frames[0], start_x, start_y, end_x=end_x, end_y=end_y)
-    # print(initial_center)
-    # initial_center = (519, 534) # Debug 1
-    # initial_center = (518, 604) # all 1
+    print(initial_center)
+    # initial_center = (518, 604) # debug 1
 
     if args.debug:
         plt.imshow(template.astype('uint8'))
@@ -52,11 +51,12 @@ if __name__ == '__main__':
         plt.imshow(temp.astype('uint8'))
         plt.savefig('out/extracted_template.png')
 
-    # gt_bbox = video_data.get_all_bbox_info(args.template_label, args.debug_frames)
+    gt_bbox = video_data.get_all_bbox_info(args.template_label, 300)
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
-    # output_path = f'out/gt_video.mp4' # test
-    # reconstruct_video(output_path, video, gt_bbox)
-        
+    # output_path = f'out/gt_video_{args.template_label}.mp4' # test 
+    # reconstruct_video(output_path, video_data.frames[:300, :, :, :], gt_bbox)
+    
     bounding_box_coords = {
         'mean_shift': [],
         'covariance': [],
@@ -91,14 +91,20 @@ if __name__ == '__main__':
         count = 0
         for center in centers:
             coords = get_bounding_box_coords(center, template_height, template_width)
-            if args.debug:
-                temp = video_data.frames[count, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
-                plt.imshow(temp.astype('uint8'))
-                plt.savefig(f'out/ms_{count}.png')
+            # if args.debug:
+            #     temp = video_data.frames[count, coords[0][0][1]:coords[1][0][1], coords[0][0][0]:coords[0][1][0], :]
+            #     plt.imshow(temp.astype('uint8'))
+            #     plt.savefig(f'out/ms_{count}.png')
 
-            count += 1
+            # count += 1
 
             bounding_box_coords['mean_shift'].append(coords)
+
+        output_path = 'out/mean_shift_video' + str(current_datetime) + '.mp4'
+        reconstruct_video(output_path, video, bounding_box_coords['mean_shift'])
+        iou, ssim = eval(video, bounding_box_coords['mean_shift'], gt_bbox)
+        accuracy['mean_shift']['iou'] = iou
+        accuracy['mean_shift']['ssim'] = ssim   
 
     if args.covariance:
         initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
@@ -110,16 +116,21 @@ if __name__ == '__main__':
         covariance = CovarianceTracker(video, template_height, template_width)
         bboxs = covariance.run(initial_bbox)
 
-        count = 0
-        for bbox in bboxs:
-            if args.debug:
-                temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :]
-                plt.imshow(temp.astype('uint8'))
-                plt.savefig(f'out/ms_{count}.png')
+        # count = 0
+        # for bbox in bboxs:
+        #     if args.debug:
+        #         temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :]
+        #         plt.imshow(temp.astype('uint8'))
+        #         plt.savefig(f'out/ms_{count}.png')
 
-            count += 1
+        #     count += 1
 
         bounding_box_coords['covariance'] = bboxs
+        output_path = 'out/covariance_video' + str(current_datetime) + '.mp4'
+        reconstruct_video(output_path, video, bounding_box_coords['covariance'])
+        iou, ssim = eval(video, bounding_box_coords['covariance'], gt_bbox)
+        accuracy['covariance']['iou'] = iou
+        accuracy['covariance']['ssim'] = ssim   
 
     if args.klt:
         initial_bbox = get_bounding_box_coords(initial_center, template_height, template_width)
@@ -128,42 +139,24 @@ if __name__ == '__main__':
         if args.debug and args.debug_frames > 0:
             video = video[0:args.debug_frames]
         
-        klt = KLTTracker(video, template_height, template_width)
+        klt = KLTTracker(video)
         bboxs = klt.run(initial_bbox)
 
-        count = 0
-        for bbox in bboxs:
-            if args.debug:
-                temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :]
-                plt.imshow(temp.astype('uint8'))
-                plt.savefig(f'out/ms_{count}.png')
+        # count = 0
+        # for bbox in bboxs:
+        #     if args.debug:
+        #         temp = video_data.frames[count, bbox[0][0][1]:bbox[1][0][1], bbox[0][0][0]:bbox[0][1][0], :]
+        #         plt.imshow(temp.astype('uint8'))
+        #         plt.savefig(f'out/ms_{count}.png')
 
-            count += 1
+        #     count += 1
 
         bounding_box_coords['klt'] = bboxs
-
-    # TODO: Save results, i.e. reconstruct video
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-    output_path = 'out/covariance_video' + str(current_datetime) + '.mp4' # test
-    # file_path = r'C:\Users\anaxx\Desktop\AU23\CSE5524\cse5524-project\out\bbox_coords_result2023-11-25 19-27-00.json'
-    file_path = r'C:\Users\anaxx\Desktop\AU23\CSE5524\cse5524-project\out\bbox_coords_result' + str(current_datetime) + '.json'
-
-
-    if args.mean_shift or args.covariance or args.klt:
-        with open(file_path, 'w') as file:
-            file.write(str(bounding_box_coords))
-        output_path = 'out/covariance_video' + str(current_datetime) + '.mp4'
-        reconstruct_video(output_path, video, bounding_box_coords['covariance'])
-
-    with open(file_path, 'r') as file:
-        pred_bboxes = file.read()
-        pred_bboxes = ast.literal_eval(pred_bboxes)
-    
-    video = video_data.frames
-    # reconstruct_video(output_path, video, pred_bboxes['mean_shift'])
-    gt_bbox = video_data.get_all_bbox_info(args.template_label, len(pred_bboxes['covariance']))
-    iou, ssim = eval(video, pred_bboxes['covariance'], gt_bbox)
-    accuracy['covariance']['iou'] = iou
-    accuracy['covariance']['ssim'] = ssim
-
+        bounding_box_coords['klt'] = bboxs
+        output_path = 'out/klt_video' + str(current_datetime) + '.mp4'
+        reconstruct_video(output_path, video, bounding_box_coords['klt'])
+        iou, ssim = eval(video, bounding_box_coords['klt'], gt_bbox)
+        accuracy['klt']['iou'] = iou
+        accuracy['klt']['ssim'] = ssim 
+        
     print(accuracy)
